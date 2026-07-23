@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gnolex CV Generator</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+/* =========================================================================
+   1. APP CHROME STYLES (never printed — free to be colorful / opinionated)
+   ========================================================================= */
+:root{
+  --gnolex-primary:#1f4e79;
+  --gnolex-primary-dark:#163a5c;
+  --gnolex-bg:#f2f4f7;
+}
+body{ background:var(--gnolex-bg); }
+
+.app-header{
+  background:linear-gradient(135deg,var(--gnolex-primary),var(--gnolex-primary-dark));
+  color:#fff;
+  padding:.85rem 1.25rem;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
+.app-header h1{
+  font-size:1.35rem;
+  font-weight:700;
+  margin:0;
+  letter-spacing:.3px;
+}
+.app-header small{ opacity:.85; }
+
+.app-toolbar{
+  background:#fff;
+  border-bottom:1px solid #dde2e8;
+  padding:.5rem 1.25rem;
+  position:sticky;
+  top:0;
+  z-index:20;
+}
+
+.editor-col{ max-height:calc(100vh - 130px); overflow-y:auto; padding-bottom:2rem; }
+.preview-col{ max-height:calc(100vh - 130px); overflow-y:auto; padding-bottom:2rem; }
+
+.section-card{
+  background:#fff;
+  border:1px solid #dde2e8;
+  border-radius:.5rem;
+  margin-bottom:.85rem;
+  transition:opacity .15s ease;
+}
+.section-card.section-hidden{ opacity:.55; }
+.section-card .card-header-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  background:#eef2f6;
+  border-bottom:1px solid #dde2e8;
+  border-radius:.5rem .5rem 0 0;
+  padding:.4rem .6rem;
+}
+.section-card .card-header-bar .title-input{
+  font-weight:600;
+  border:1px solid transparent;
+  background:transparent;
+  max-width:220px;
+}
+.section-card .card-header-bar .title-input:focus{
+  border-color:#adb5bd;
+  background:#fff;
+}
+.section-move-btns .btn{ padding:.1rem .4rem; line-height:1; }
+
+.item-block{
+  border:1px dashed #cfd6dd;
+  border-radius:.4rem;
+  padding:.6rem;
+  margin-bottom:.6rem;
+  background:#fbfcfd;
+}
+.item-block-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:.4rem;
+}
+.bullet-row{ display:flex; gap:.4rem; align-items:center; margin-bottom:.3rem; }
+.bullet-row input{ flex:1; }
+
+.editor-scroll-hint{ font-size:.75rem; color:#6c757d; }
+
+.ats-score-circle{
+  font-size:2.1rem;
+  font-weight:800;
+}
+.ats-breakdown-item{ border-bottom:1px solid #eee; padding:.5rem 0; }
+.ats-breakdown-item:last-child{ border-bottom:none; }
+.ats-tip{ font-size:.78rem; color:#555; }
+
+#addSectionBar{
+  background:#fff;
+  border:1px dashed #adb5bd;
+  border-radius:.5rem;
+  padding:.75rem;
+}
+
+.nav-pills .nav-link.active{ background-color:var(--gnolex-primary); }
+
+.panel-toggle-btn{
+  background:transparent;
+  border:1px solid transparent;
+  color:#333;
+  font-size:.9rem;
+  line-height:1;
+  padding:.25rem .4rem;
+  transition:transform .15s ease;
+}
+.panel-toggle-btn.collapsed{ transform:rotate(-90deg); }
+
+.save-cache-toolbar{ font-size:.78rem; color:#555; }
+#saveErrorMsg{ max-width:260px; }
+.photo-thumb{
+  width:60px;
+  height:60px;
+  object-fit:cover;
+  border-radius:50%;
+  border:1px solid #ccc;
+}
+
+/* =========================================================================
+   2. CV / COVER LETTER CANVAS — STATIC, ATS-SAFE, PRINT-READY
+   Single monochrome palette. One accent color max (divider lines only).
+   No background images, no colored blocks, no icon-only labels.
+   ========================================================================= */
+.doc-page{
+  width:8.5in;
+  min-height:11in;
+  margin:0 auto 24px auto;
+  background:#ffffff;
+  color:#161616;
+  font-family:Arial, Helvetica, "Liberation Sans", sans-serif;
+  font-size:10.5pt;
+  line-height:1.45;
+  padding:0.65in 0.75in;
+  box-shadow:0 0 12px rgba(0,0,0,.15);
+}
+.doc-header{ position:relative; }
+.doc-photo{
+  position:absolute;
+  top:0;
+  right:0;
+  width:0.9in;
+  height:0.9in;
+  object-fit:cover;
+  border-radius:4px;
+  border:1px solid #ccc;
+}
+.doc-name{
+  font-size:20pt;
+  font-weight:700;
+  text-align:center;
+  margin:0 0 3px 0;
+  color:#111;
+}
+.doc-contact{
+  font-size:9.5pt;
+  text-align:center;
+  color:#333;
+  margin-bottom:16px;
+}
+.doc-contact a{ color:#333; text-decoration:none; }
+.doc-section{ margin-bottom:14px; }
+.doc-section-title{
+  font-size:11.5pt;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  border-bottom:1.5px solid #2c5f8a; /* the one permitted accent color */
+  padding-bottom:3px;
+  margin-bottom:8px;
+  break-after:avoid;
+  page-break-after:avoid;
+}
+.doc-summary{ white-space:pre-wrap; margin:0; }
+.entry-block{
+  margin-bottom:10px;
+  break-inside:avoid;
+  page-break-inside:avoid;
+}
+.entry-block:last-child{ margin-bottom:0; }
+.entry-title-row{
+  display:flex;
+  justify-content:space-between;
+  font-weight:700;
+  font-size:10.5pt;
+}
+.entry-subtitle-row{
+  display:flex;
+  justify-content:space-between;
+  font-style:italic;
+  font-size:9.8pt;
+  color:#333;
+  margin-bottom:3px;
+}
+.entry-bullets{ margin:2px 0 0 1.1em; padding:0; }
+.entry-bullets li{ margin-bottom:2px; }
+.entry-desc{ white-space:pre-wrap; margin:2px 0 0 0; }
+.skills-line{ margin-bottom:4px; }
+.skills-line strong{ font-weight:700; }
+
+.doc-empty-hint{ color:#999; font-style:italic; text-align:center; padding:2in 0; }
+
+/* =========================================================================
+   3. PRINT RULES — only the active CV/Cover-Letter canvas prints
+   ========================================================================= */
+@media print{
+  .no-print, .app-header, .app-toolbar, .editor-col, .ats-col, .nav-pills{
+    display:none !important;
+  }
+  body{ background:#fff; }
+  .preview-col{ max-height:none !important; overflow:visible !important; padding:0 !important; }
+  .doc-page{
+    box-shadow:none !important;
+    margin:0 !important;
+    width:100% !important;
+    min-height:0 !important;
+  }
+  @page{ size:auto; margin:0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================= APP HEADER (app chrome only, never printed) ============================= -->
+<header class="app-header no-print">
+  <h1>Gnolex CV Generator</h1>
+  <small>ATS-safe resume &amp; cover letter builder — live preview, zero setup</small>
+</header>
+
+<!-- ============================= TOOLBAR ============================= -->
+<div class="app-toolbar no-print">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <ul class="nav nav-pills" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#cvTab" type="button" role="tab">CV / Resume</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#coverTab" type="button" role="tab">Cover Letter</button>
+      </li>
+    </ul>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="saveDataBtn">Save / Cache Data</button>
+        <span class="save-cache-toolbar" id="lastSavedLabel">Last saved: never</span>
+      </div>
+      <button type="button" class="btn btn-outline-warning btn-sm" id="clearCacheBtn">Clear Saved Data</button>
+      <button type="button" class="btn btn-outline-danger btn-sm" id="resetBtn">Reset / Clear All</button>
+    </div>
+  </div>
+  <div id="saveErrorMsg" class="text-danger small mt-1" style="display:none;"></div>
+</div>
+
+<div class="container-fluid tab-content">
+
+  <!-- ============================= CV TAB ============================= -->
+  <div class="tab-pane fade show active" id="cvTab" role="tabpanel">
+    <div class="row">
+
+      <!-- EDITOR PANEL -->
+      <div class="col-lg-6 editor-col no-print">
+        <div class="pt-3">
+
+          <!-- Personal Info -->
+          <div class="section-card">
+            <div class="card-header-bar">
+              <button type="button" class="panel-toggle-btn" data-bs-toggle="collapse" data-bs-target="#collapse-personal" aria-expanded="true" aria-controls="collapse-personal" title="Expand/collapse">&#9662;</button>
+              <span class="flex-grow-1 fw-semibold">Personal Info / Contact</span>
+            </div>
+            <div class="collapse show" id="collapse-personal" data-panel-id="personal">
+              <div class="p-3">
+                <div class="row g-2">
+                  <div class="col-md-6"><label class="form-label small mb-0">Full Name</label>
+                    <input type="text" class="form-control form-control-sm" data-personal="name" placeholder="Jane Doe"></div>
+                  <div class="col-md-6"><label class="form-label small mb-0">Location</label>
+                    <input type="text" class="form-control form-control-sm" data-personal="location" placeholder="City, State"></div>
+                  <div class="col-md-6"><label class="form-label small mb-0">Phone</label>
+                    <input type="text" class="form-control form-control-sm" data-personal="phone" placeholder="(555) 123-4567"></div>
+                  <div class="col-md-6"><label class="form-label small mb-0">Email</label>
+                    <input type="email" class="form-control form-control-sm" data-personal="email" placeholder="jane@example.com"></div>
+                  <div class="col-md-6"><label class="form-label small mb-0">LinkedIn</label>
+                    <input type="text" class="form-control form-control-sm" data-personal="linkedin" placeholder="linkedin.com/in/janedoe"></div>
+                  <div class="col-md-6"><label class="form-label small mb-0">Portfolio / Website</label>
+                    <input type="text" class="form-control form-control-sm" data-personal="portfolio" placeholder="janedoe.dev"></div>
+                </div>
+                <hr>
+                <label class="form-label small fw-semibold mb-1">Profile Photo (optional)</label>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <img id="photoPreview" class="photo-thumb" style="display:none;" alt="Profile photo preview">
+                  <input type="file" accept="image/*" class="form-control form-control-sm" id="photoInput" style="max-width:220px;">
+                  <button type="button" class="btn btn-sm btn-outline-danger" id="removePhotoBtn" style="display:none;">Remove Photo</button>
+                </div>
+                <div class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="showPhotoToggle">
+                  <label class="form-check-label small" for="showPhotoToggle">Show photo on CV</label>
+                </div>
+                <div class="form-text">Photos can hurt ATS parsing and are discouraged or disallowed for some regions/industries — leave this off unless you're confident it's appropriate for your target roles.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Professional Summary -->
+          <div class="section-card">
+            <div class="card-header-bar">
+              <button type="button" class="panel-toggle-btn" data-bs-toggle="collapse" data-bs-target="#collapse-summary" aria-expanded="true" aria-controls="collapse-summary" title="Expand/collapse">&#9662;</button>
+              <span class="flex-grow-1 fw-semibold">Professional Summary</span>
+            </div>
+            <div class="collapse show" id="collapse-summary" data-panel-id="summary">
+              <div class="p-3">
+                <textarea class="form-control form-control-sm" rows="3" data-summary placeholder="2-3 sentence summary of your experience and value..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic sections mount point -->
+          <div id="sectionsContainer"></div>
+
+          <!-- Add Section bar -->
+          <div id="addSectionBar" class="mb-4">
+            <div class="fw-semibold small mb-2">Add a section</div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-add-standard="certifications">+ Certifications</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-add-standard="projects">+ Projects</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-add-standard="languages">+ Languages</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-add-standard="awards">+ Awards / Publications</button>
+            </div>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="customSectionTitleInput" placeholder="Custom section title (e.g. Clinical Rotations)">
+              <button type="button" class="btn btn-primary" id="addCustomSectionBtn">+ Add Custom Section</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PREVIEW + ATS PANEL -->
+      <div class="col-lg-6">
+        <div class="row">
+          <div class="col-12 ats-col no-print pt-3">
+            <div class="section-card">
+              <div class="card-header-bar"><span>Live ATS Score</span>
+                <button type="button" class="btn btn-sm btn-primary" id="printCvBtn">Print / Export to PDF</button>
+              </div>
+              <div class="p-3">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                  <div class="ats-score-circle" id="atsScoreValue">0</div>
+                  <div class="flex-grow-1">
+                    <div class="progress" role="progressbar" style="height:14px;">
+                      <div class="progress-bar" id="atsScoreBar" style="width:0%">0%</div>
+                    </div>
+                  </div>
+                </div>
+                <div id="photoWarning" class="alert alert-warning py-1 px-2 small mb-2" style="display:none;">Photo included — some ATS systems and recruiters may deprioritize CVs with photos. Consider disabling for maximum ATS compatibility.</div>
+                <div id="atsBreakdown"></div>
+                <hr>
+                <label class="form-label small fw-semibold mb-1">Target Job Description (optional — enables keyword match scoring)</label>
+                <textarea class="form-control form-control-sm mb-2" rows="3" data-jobdesc placeholder="Paste the job posting text here..."></textarea>
+                <div class="small mb-1"><strong>Matched keywords:</strong></div>
+                <div id="matchedKeywords" class="mb-2"></div>
+                <div class="small mb-1"><strong>Missing keywords:</strong></div>
+                <div id="missingKeywords"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 preview-col pt-3">
+            <div class="doc-page" id="cvPreview"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================= COVER LETTER TAB ============================= -->
+  <div class="tab-pane fade" id="coverTab" role="tabpanel">
+    <div class="row">
+
+      <div class="col-lg-6 editor-col no-print" id="clEditor">
+        <div class="pt-3">
+          <div class="section-card">
+            <div class="card-header-bar"><span>Cover Letter Details</span></div>
+            <div class="p-3">
+              <div class="form-text mb-2">Your name, contact info, and most recent job title are pulled automatically from the CV tab.</div>
+              <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small mb-0">Hiring Manager Name (optional)</label>
+                  <input type="text" class="form-control form-control-sm" data-cl="hiringManager" placeholder="Alex Smith"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">Company Name</label>
+                  <input type="text" class="form-control form-control-sm" data-cl="companyName" placeholder="Acme Corp"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">Job Title Applying For</label>
+                  <input type="text" class="form-control form-control-sm" data-cl="jobTitle" placeholder="Senior Product Manager"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">Tone</label>
+                  <select class="form-select form-select-sm" data-cl="tone">
+                    <option value="Formal">Formal</option>
+                    <option value="Enthusiastic">Enthusiastic</option>
+                    <option value="Concise">Concise</option>
+                  </select>
+                </div>
+              </div>
+              <hr>
+              <label class="form-label small fw-semibold mb-1">Key point 1 — why you / why this role</label>
+              <textarea class="form-control form-control-sm mb-2" rows="2" data-cl-point="0"></textarea>
+              <label class="form-label small fw-semibold mb-1">Key point 2</label>
+              <textarea class="form-control form-control-sm mb-2" rows="2" data-cl-point="1"></textarea>
+              <label class="form-label small fw-semibold mb-1">Key point 3</label>
+              <textarea class="form-control form-control-sm mb-2" rows="2" data-cl-point="2"></textarea>
+              <label class="form-label small fw-semibold mb-1">Key point 4 (optional)</label>
+              <textarea class="form-control form-control-sm" rows="2" data-cl-point="3"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="pt-3 no-print d-flex justify-content-end mb-2">
+          <button type="button" class="btn btn-sm btn-primary" id="printClBtn">Print / Export to PDF</button>
+        </div>
+        <div class="preview-col">
+          <div class="doc-page" id="clPreview"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* =========================================================================
+   JS DATA MODEL
+   ========================================================================= */
+let uidCounter = 0;
+function uid(){ return 'id' + (++uidCounter); }
+
+function esc(str){
+  if(str === undefined || str === null) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const SECTION_META = {
+  experience:    { label:'Experience',              addLabel:'Work Experience Entry', newItem:()=>({id:uid(), jobTitle:'', company:'', location:'', startDate:'', endDate:'', current:false, bullets:[{id:uid(), text:''}]}) },
+  education:     { label:'Education',                addLabel:'Education Entry',       newItem:()=>({id:uid(), degree:'', institution:'', location:'', gradDate:'', gpa:''}) },
+  skills:        { label:'Skills',                   addLabel:'Skill Category',        newItem:()=>({id:uid(), category:'Technical Skills', list:''}) },
+  certifications:{ label:'Certifications',           addLabel:'Certification',         newItem:()=>({id:uid(), name:'', issuer:'', date:''}) },
+  projects:      { label:'Projects',                 addLabel:'Project',               newItem:()=>({id:uid(), name:'', description:'', tech:'', link:''}) },
+  languages:     { label:'Languages',                addLabel:'Language',              newItem:()=>({id:uid(), language:'', proficiency:'Fluent'}) },
+  awards:        { label:'Awards / Publications',    addLabel:'Award / Publication',   newItem:()=>({id:uid(), title:'', issuer:'', date:'', description:''}) },
+  custom:        { label:'Custom Section',           addLabel:'Entry',                 newItem:()=>({id:uid(), title:'', subtitle:'', date:'', description:''}) }
+};
+
+const CONVENTIONAL_TITLES = {
+  experience: ['experience','work experience','professional experience','employment history','work history'],
+  education:  ['education','academic background'],
+  skills:     ['skills','technical skills','core competencies','skills & competencies','key skills']
+};
+
+function newSection(type, title){
+  return { id:uid(), type, title: title || SECTION_META[type].label, visible:true, items:[SECTION_META[type].newItem()] };
+}
+
+function defaultState(){
+  return {
+    personal:{ name:'', phone:'', email:'', location:'', linkedin:'', portfolio:'', photoDataUrl:null, showPhoto:false },
+    summary:'',
+    jobDescription:'',
+    sections:[
+      newSection('experience'),
+      newSection('education'),
+      newSection('skills')
+    ],
+    coverLetter:{ hiringManager:'', companyName:'', jobTitle:'', tone:'Formal', points:['','','',''] }
+  };
+}
+
+let state = defaultState();
+
+/* =========================================================================
+   PANEL-STATE TRACKER
+   Tracks which editor accordion panels are open/closed, keyed by section id
+   (or 'personal' / 'summary' for the two fixed panels). Re-applied on every
+   render so adding/removing/reordering entries never disturbs the panel the
+   user currently has open. Absence of a key means "open" (default state).
+   ========================================================================= */
+let panelState = {};
+function isPanelOpen(id){ return panelState[id] !== false; }
+
+function moveInArray(arr, id, dir){
+  const idx = arr.findIndex(x=>x.id===id);
+  if(idx===-1) return;
+  const newIdx = idx+dir;
+  if(newIdx<0 || newIdx>=arr.length) return;
+  const tmp = arr[idx]; arr[idx]=arr[newIdx]; arr[newIdx]=tmp;
+}
+
+/* =========================================================================
+   EDITOR RENDER FUNCTIONS
+   ========================================================================= */
+function renderEditor(){
+  const container = document.getElementById('sectionsContainer');
+  container.innerHTML = state.sections.map((section, idx) => buildSectionCard(section, idx===0, idx===state.sections.length-1)).join('');
+}
+
+function buildSectionCard(section, isFirst, isLast){
+  const meta = SECTION_META[section.type];
+  const removable = section.type === 'custom';
+  const open = isPanelOpen(section.id);
+  const collapseId = 'collapse-' + section.id;
+  return `
+  <div class="section-card ${section.visible? '' : 'section-hidden'}" data-card-section="${section.id}">
+    <div class="card-header-bar">
+      <button type="button" class="panel-toggle-btn ${open?'':'collapsed'}" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${open}" aria-controls="${collapseId}" title="Expand/collapse">&#9662;</button>
+      <input type="text" class="form-control form-control-sm title-input flex-grow-1" data-title-field data-section-id="${section.id}" value="${esc(section.title)}">
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" data-action="toggle-visibility" data-section-id="${section.id}" ${section.visible?'checked':''}>
+          <label class="form-check-label small">Show</label>
+        </div>
+        <div class="section-move-btns">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="move-section-up" data-section-id="${section.id}" ${isFirst?'disabled':''} title="Move section up">&uarr;</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="move-section-down" data-section-id="${section.id}" ${isLast?'disabled':''} title="Move section down">&darr;</button>
+          ${removable ? `<button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-section" data-section-id="${section.id}" title="Delete section">&times;</button>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="collapse ${open?'show':''}" id="${collapseId}" data-panel-id="${section.id}">
+      <div class="p-3">
+        ${section.items.map((item, i) => buildItemEditor(section, item, i===0, i===section.items.length-1)).join('')}
+        <button type="button" class="btn btn-sm btn-outline-primary" data-action="add-item" data-section-id="${section.id}">+ Add ${esc(meta.addLabel)}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function itemHeaderButtons(section, item, isFirst, isLast){
+  return `
+    <div class="d-flex gap-1">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-action="move-item-up" data-section-id="${section.id}" data-item-id="${item.id}" ${isFirst?'disabled':''}>&uarr;</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-action="move-item-down" data-section-id="${section.id}" data-item-id="${item.id}" ${isLast?'disabled':''}>&darr;</button>
+      <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-item" data-section-id="${section.id}" data-item-id="${item.id}">Remove &times;</button>
+    </div>`;
+}
+
+function buildItemEditor(section, item, isFirst, isLast){
+  const sid = section.id, iid = item.id;
+  const f = (field) => `data-section-id="${sid}" data-item-id="${iid}" data-field="${field}"`;
+  switch(section.type){
+    case 'experience':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Experience</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Job Title" ${f('jobTitle')} value="${esc(item.jobTitle)}"></div>
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Company" ${f('company')} value="${esc(item.company)}"></div>
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Location" ${f('location')} value="${esc(item.location)}"></div>
+          <div class="col-md-6 d-flex align-items-center gap-2">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" ${f('current')} ${item.current?'checked':''}>
+              <label class="form-check-label small">Currently working here</label>
+            </div>
+          </div>
+          <div class="col-md-6"><label class="small mb-0">Start Date</label><input type="text" class="form-control form-control-sm" placeholder="Jan 2022" ${f('startDate')} value="${esc(item.startDate)}"></div>
+          <div class="col-md-6"><label class="small mb-0">End Date</label><input type="text" class="form-control form-control-sm" placeholder="Present" ${f('endDate')} value="${esc(item.endDate)}" ${item.current?'disabled':''}></div>
+        </div>
+        <label class="small fw-semibold mb-1">Achievements</label>
+        ${item.bullets.map(b => `
+          <div class="bullet-row">
+            <input type="text" class="form-control form-control-sm" placeholder="Led a team of 5 to increase revenue by 20%..." data-section-id="${sid}" data-item-id="${iid}" data-bullet-id="${b.id}" value="${esc(b.text)}">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove-bullet" data-section-id="${sid}" data-item-id="${iid}" data-bullet-id="${b.id}">&times;</button>
+          </div>`).join('')}
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-action="add-bullet" data-section-id="${sid}" data-item-id="${iid}">+ Add bullet</button>
+      </div>`;
+    case 'education':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Education</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Degree" ${f('degree')} value="${esc(item.degree)}"></div>
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Institution" ${f('institution')} value="${esc(item.institution)}"></div>
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="Location" ${f('location')} value="${esc(item.location)}"></div>
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="Graduation Date" ${f('gradDate')} value="${esc(item.gradDate)}"></div>
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="GPA (optional)" ${f('gpa')} value="${esc(item.gpa)}"></div>
+        </div>
+      </div>`;
+    case 'skills':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Skill Category</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="Category (e.g. Technical Skills)" ${f('category')} value="${esc(item.category)}"></div>
+          <div class="col-md-8"><input type="text" class="form-control form-control-sm" placeholder="Comma-separated: JavaScript, SQL, Leadership..." ${f('list')} value="${esc(item.list)}"></div>
+        </div>
+      </div>`;
+    case 'certifications':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Certification</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-5"><input type="text" class="form-control form-control-sm" placeholder="Certification Name" ${f('name')} value="${esc(item.name)}"></div>
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="Issuer" ${f('issuer')} value="${esc(item.issuer)}"></div>
+          <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="Date" ${f('date')} value="${esc(item.date)}"></div>
+        </div>
+      </div>`;
+    case 'projects':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Project</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Project Name" ${f('name')} value="${esc(item.name)}"></div>
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Tech Used" ${f('tech')} value="${esc(item.tech)}"></div>
+          <div class="col-md-12"><input type="text" class="form-control form-control-sm" placeholder="Link (optional)" ${f('link')} value="${esc(item.link)}"></div>
+          <div class="col-md-12"><textarea class="form-control form-control-sm" rows="2" placeholder="Description" ${f('description')}>${esc(item.description)}</textarea></div>
+        </div>
+      </div>`;
+    case 'languages':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Language</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Language" ${f('language')} value="${esc(item.language)}"></div>
+          <div class="col-md-6">
+            <select class="form-select form-select-sm" ${f('proficiency')}>
+              ${['Native','Fluent','Professional Working Proficiency','Limited Working Proficiency','Elementary Proficiency'].map(p=>`<option value="${p}" ${item.proficiency===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`;
+    case 'awards':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Award / Publication</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-5"><input type="text" class="form-control form-control-sm" placeholder="Title" ${f('title')} value="${esc(item.title)}"></div>
+          <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="Issuer / Publisher" ${f('issuer')} value="${esc(item.issuer)}"></div>
+          <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="Date" ${f('date')} value="${esc(item.date)}"></div>
+          <div class="col-md-12"><textarea class="form-control form-control-sm" rows="2" placeholder="Description (optional)" ${f('description')}>${esc(item.description)}</textarea></div>
+        </div>
+      </div>`;
+    case 'custom':
+      return `
+      <div class="item-block">
+        <div class="item-block-header"><strong class="small text-muted">Entry</strong>${itemHeaderButtons(section,item,isFirst,isLast)}</div>
+        <div class="row g-2">
+          <div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Title" ${f('title')} value="${esc(item.title)}"></div>
+          <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="Subtitle" ${f('subtitle')} value="${esc(item.subtitle)}"></div>
+          <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="Date" ${f('date')} value="${esc(item.date)}"></div>
+          <div class="col-md-12"><textarea class="form-control form-control-sm" rows="2" placeholder="Description" ${f('description')}>${esc(item.description)}</textarea></div>
+        </div>
+      </div>`;
+  }
+  return '';
+}
+
+/* =========================================================================
+   PREVIEW RENDER FUNCTIONS (CV)
+   ========================================================================= */
+function isItemEmpty(type, item){
+  switch(type){
+    case 'experience': return !item.jobTitle.trim() && !item.company.trim() && item.bullets.every(b=>!b.text.trim());
+    case 'education': return !item.degree.trim() && !item.institution.trim();
+    case 'skills': return !item.list.trim();
+    case 'certifications': return !item.name.trim();
+    case 'projects': return !item.name.trim() && !item.description.trim();
+    case 'languages': return !item.language.trim();
+    case 'awards': return !item.title.trim();
+    case 'custom': return !item.title.trim() && !item.description.trim();
+  }
+  return true;
+}
+
+function contactLine(p){
+  const parts = [];
+  if(p.location.trim()) parts.push(esc(p.location));
+  if(p.phone.trim()) parts.push(esc(p.phone));
+  if(p.email.trim()) parts.push(esc(p.email));
+  if(p.linkedin.trim()) parts.push(esc(p.linkedin));
+  if(p.portfolio.trim()) parts.push(esc(p.portfolio));
+  return parts.join(' &nbsp;|&nbsp; ');
+}
+
+function dateRange(item){
+  const start = esc(item.startDate);
+  const end = item.current ? 'Present' : esc(item.endDate);
+  if(!start && !end) return '';
+  return `${start}${(start||end)?' – ':''}${end}`;
+}
+
+function buildItemPreview(section, item){
+  switch(section.type){
+    case 'experience':
+      return `
+      <div class="entry-block">
+        <div class="entry-title-row"><span>${esc(item.jobTitle)||'Job Title'}</span><span>${dateRange(item)}</span></div>
+        <div class="entry-subtitle-row"><span>${esc(item.company)}</span><span>${esc(item.location)}</span></div>
+        <ul class="entry-bullets">
+          ${item.bullets.filter(b=>b.text.trim()).map(b=>`<li>${esc(b.text)}</li>`).join('')}
+        </ul>
+      </div>`;
+    case 'education':
+      return `
+      <div class="entry-block">
+        <div class="entry-title-row"><span>${esc(item.degree)}</span><span>${esc(item.gradDate)}</span></div>
+        <div class="entry-subtitle-row"><span>${esc(item.institution)}</span><span>${esc(item.location)}</span></div>
+        ${item.gpa.trim() ? `<div>GPA: ${esc(item.gpa)}</div>` : ''}
+      </div>`;
+    case 'skills':
+      return `<div class="skills-line"><strong>${esc(item.category)}:</strong> ${esc(item.list)}</div>`;
+    case 'certifications':
+      return `<div class="entry-block"><div class="entry-title-row"><span>${esc(item.name)}${item.issuer.trim()?' — '+esc(item.issuer):''}</span><span>${esc(item.date)}</span></div></div>`;
+    case 'projects':
+      return `
+      <div class="entry-block">
+        <div class="entry-title-row"><span>${esc(item.name)}${item.tech.trim()?' ('+esc(item.tech)+')':''}</span></div>
+        ${item.description.trim() ? `<div class="entry-desc">${esc(item.description)}</div>` : ''}
+        ${item.link.trim() ? `<div>${esc(item.link)}</div>` : ''}
+      </div>`;
+    case 'languages':
+      return `<div class="skills-line">${esc(item.language)} — ${esc(item.proficiency)}</div>`;
+    case 'awards':
+      return `
+      <div class="entry-block">
+        <div class="entry-title-row"><span>${esc(item.title)}${item.issuer.trim()?' — '+esc(item.issuer):''}</span><span>${esc(item.date)}</span></div>
+        ${item.description.trim() ? `<div class="entry-desc">${esc(item.description)}</div>` : ''}
+      </div>`;
+    case 'custom':
+      return `
+      <div class="entry-block">
+        <div class="entry-title-row"><span>${esc(item.title)}${item.subtitle.trim()?' — '+esc(item.subtitle):''}</span><span>${esc(item.date)}</span></div>
+        ${item.description.trim() ? `<div class="entry-desc">${esc(item.description)}</div>` : ''}
+      </div>`;
+  }
+  return '';
+}
+
+function buildSectionPreview(section){
+  const visibleItems = section.items.filter(item => !isItemEmpty(section.type, item));
+  if(visibleItems.length===0) return '';
+  return `
+  <div class="doc-section">
+    <div class="doc-section-title">${esc(section.title)}</div>
+    ${visibleItems.map(item => buildItemPreview(section, item)).join('')}
+  </div>`;
+}
+
+function renderCVPreview(){
+  const p = state.personal;
+  const hasAnyContent = p.name.trim() || state.summary.trim() || state.sections.some(s=>s.items.some(i=>!isItemEmpty(s.type,i)));
+  let html = '';
+  html += `<div class="doc-header">`;
+  if(p.showPhoto && p.photoDataUrl && p.photoDataUrl.startsWith('data:image/')){
+    html += `<img class="doc-photo" src="${p.photoDataUrl}" alt="">`;
+  }
+  html += `<div class="doc-name">${esc(p.name) || 'Your Name'}</div>`;
+  html += `<div class="doc-contact">${contactLine(p) || 'Phone &nbsp;|&nbsp; Email &nbsp;|&nbsp; Location'}</div>`;
+  html += `</div>`;
+  if(state.summary.trim()){
+    html += `<div class="doc-section"><div class="doc-section-title">Professional Summary</div><p class="doc-summary">${esc(state.summary)}</p></div>`;
+  }
+  state.sections.forEach(section=>{
+    if(!section.visible) return;
+    html += buildSectionPreview(section);
+  });
+  if(!hasAnyContent){
+    html += `<div class="doc-empty-hint">Start typing on the left to build your CV — this preview updates live.</div>`;
+  }
+  document.getElementById('cvPreview').innerHTML = html;
+}
+
+/* =========================================================================
+   COVER LETTER
+   ========================================================================= */
+function renderCLEditor(){
+  const cl = state.coverLetter;
+  document.querySelector('[data-cl="hiringManager"]').value = cl.hiringManager;
+  document.querySelector('[data-cl="companyName"]').value = cl.companyName;
+  document.querySelector('[data-cl="jobTitle"]').value = cl.jobTitle;
+  document.querySelector('[data-cl="tone"]').value = cl.tone;
+  document.querySelectorAll('[data-cl-point]').forEach(el=>{
+    el.value = cl.points[Number(el.dataset.clPoint)] || '';
+  });
+}
+
+function getMostRecentExperience(){
+  const expSection = state.sections.find(s=>s.type==='experience');
+  if(!expSection) return null;
+  const item = expSection.items.find(i=>!isItemEmpty('experience', i));
+  return item || null;
+}
+
+function getTopSkills(n){
+  const skillsSection = state.sections.find(s=>s.type==='skills');
+  if(!skillsSection) return [];
+  const all = [];
+  skillsSection.items.forEach(item=>{
+    item.list.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>all.push(s));
+  });
+  return all.slice(0, n);
+}
+
+function todayFormatted(){
+  const d = new Date();
+  return d.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+}
+
+function buildCoverLetterBody(){
+  const p = state.personal;
+  const cl = state.coverLetter;
+  const recentJob = getMostRecentExperience();
+  const skills = getTopSkills(5);
+  const skillsText = skills.length ? skills.join(', ') : 'a strong, relevant skill set';
+  const jobTitle = cl.jobTitle.trim() || 'this position';
+  const company = cl.companyName.trim() || 'your organization';
+  const points = cl.points.filter(pt=>pt.trim());
+
+  const tonePhrases = {
+    Formal: {
+      opener: `I am writing to express my interest in the ${jobTitle} position at ${company}.`,
+      bridge: recentJob ? `In my current role as ${esc(recentJob.jobTitle)}${recentJob.company? ' at '+esc(recentJob.company):''}, I have developed skills in ${skillsText} that align closely with this opportunity.` : `I bring experience in ${skillsText} that aligns closely with this opportunity.`,
+      pointsIntro: 'I would like to highlight the following qualifications:',
+      closer: `Thank you for considering my application. I would welcome the opportunity to discuss how my background can contribute to ${company}.`,
+      signoff: 'Sincerely,'
+    },
+    Enthusiastic: {
+      opener: `I was thrilled to see the opening for ${jobTitle} at ${company} — it's exactly the kind of opportunity I've been hoping to find!`,
+      bridge: recentJob ? `As ${esc(recentJob.jobTitle)}${recentJob.company? ' at '+esc(recentJob.company):''}, I've loved building expertise in ${skillsText}, and I can't wait to bring that energy to your team.` : `I bring genuine enthusiasm and hands-on experience in ${skillsText} to this opportunity.`,
+      pointsIntro: "Here's why I'd be a great fit:",
+      closer: `I would love the chance to talk more about how I can help ${company} succeed — thank you so much for your time and consideration!`,
+      signoff: 'Best regards,'
+    },
+    Concise: {
+      opener: `I'm applying for the ${jobTitle} role at ${company}.`,
+      bridge: recentJob ? `Currently ${esc(recentJob.jobTitle)}${recentJob.company? ' at '+esc(recentJob.company):''}, with hands-on experience in ${skillsText}.` : `Experienced in ${skillsText}.`,
+      pointsIntro: 'Highlights:',
+      closer: `Happy to discuss further at your convenience. Thank you.`,
+      signoff: 'Regards,'
+    }
+  };
+  const tone = tonePhrases[cl.tone] || tonePhrases.Formal;
+  const greeting = cl.hiringManager.trim() ? `Dear ${esc(cl.hiringManager)},` : 'Dear Hiring Manager,';
+
+  return {
+    greeting,
+    opener: tone.opener,
+    bridge: tone.bridge,
+    pointsIntro: points.length ? tone.pointsIntro : '',
+    points,
+    closer: tone.closer,
+    signoff: tone.signoff
+  };
+}
+
+function renderCLPreview(){
+  const p = state.personal;
+  const cl = state.coverLetter;
+  const letter = buildCoverLetterBody();
+  let html = '';
+  html += `<div class="doc-name">${esc(p.name) || 'Your Name'}</div>`;
+  html += `<div class="doc-contact">${contactLine(p) || 'Phone &nbsp;|&nbsp; Email &nbsp;|&nbsp; Location'}</div>`;
+  html += `<div style="margin-bottom:14px;">${esc(todayFormatted())}</div>`;
+  if(cl.companyName.trim() || cl.hiringManager.trim()){
+    html += `<div style="margin-bottom:14px;">${cl.hiringManager.trim()?esc(cl.hiringManager)+'<br>':''}${cl.companyName.trim()?esc(cl.companyName):''}</div>`;
+  }
+  html += `<div style="margin-bottom:12px;">${esc(letter.greeting)}</div>`;
+  html += `<p class="doc-summary">${esc(letter.opener)}</p>`;
+  html += `<p class="doc-summary">${esc(letter.bridge)}</p>`;
+  if(letter.points.length){
+    html += `<p class="doc-summary">${esc(letter.pointsIntro)}</p>`;
+    html += `<ul class="entry-bullets">${letter.points.map(pt=>`<li>${esc(pt)}</li>`).join('')}</ul>`;
+  }
+  html += `<p class="doc-summary">${esc(letter.closer)}</p>`;
+  html += `<div style="margin-top:18px;">${esc(letter.signoff)}<br>${esc(p.name)||'Your Name'}</div>`;
+  document.getElementById('clPreview').innerHTML = html;
+}
+
+/* =========================================================================
+   ATS SCORING ENGINE
+   ========================================================================= */
+const ACTION_VERBS = ['achieved','accelerated','accomplished','administered','advised','advocated','analyzed','architected','automated','boosted','budgeted','built','championed','coached','collaborated','conceived','conducted','configured','consolidated','constructed','coordinated','created','crafted','cultivated','decreased','delegated','delivered','designed','developed','devised','directed','discovered','doubled','drove','earned','eliminated','engineered','enhanced','established','evaluated','executed','expanded','expedited','facilitated','forecasted','formulated','founded','generated','guided','headed','identified','implemented','improved','increased','influenced','initiated','innovated','inspected','installed','instituted','instructed','integrated','introduced','invented','launched','led','leveraged','maintained','managed','mentored','migrated','minimized','modernized','monitored','motivated','negotiated','optimized','orchestrated','organized','overhauled','oversaw','partnered','pioneered','planned','presented','prioritized','produced','programmed','proposed','published','reduced','refined','reengineered','remodeled','reorganized','resolved','restructured','revamped','reviewed','scaled','secured','simplified','solved','spearheaded','standardized','streamlined','strengthened','supervised','surpassed','trained','transformed','unified','upgraded','validated'];
+const ACTION_VERB_SET = new Set(ACTION_VERBS);
+const WEAK_STARTERS = ['responsible for','duties included','worked on','helped with','tasked with','in charge of','assisted with','participated in','was involved in'];
+const STOPWORDS = new Set(['the','and','for','with','that','this','from','have','has','had','are','was','were','will','shall','you','your','our','their','his','her','its','a','an','to','of','in','on','at','by','as','is','be','or','it','we','they','not','can','all','any','but','if','so','than','then','also','into','about','over','under','more','most','such','per','via','who','what','when','where','why','how','you\'ll','we\'ll']);
+
+function wordCount(text){
+  return (text.trim().match(/\S+/g) || []).length;
+}
+
+function tokenize(text){
+  const raw = (text.toLowerCase().match(/[a-z][a-z0-9+.#-]{2,}/g) || []);
+  return raw.filter(w=>!STOPWORDS.has(w));
+}
+
+function getAllBullets(){
+  const bullets = [];
+  state.sections.forEach(sec=>{
+    if(sec.type!=='experience' || !sec.visible) return;
+    sec.items.forEach(item=>{
+      item.bullets.forEach(b=>{ if(b.text.trim()) bullets.push(b.text.trim()); });
+    });
+  });
+  return bullets;
+}
+
+function getFullText(){
+  const p = state.personal;
+  const parts = [p.name, p.location, state.summary];
+  state.sections.forEach(sec=>{
+    if(!sec.visible) return;
+    sec.items.forEach(item=>{
+      switch(sec.type){
+        case 'experience': parts.push(item.jobTitle, item.company, item.location); item.bullets.forEach(b=>parts.push(b.text)); break;
+        case 'education': parts.push(item.degree, item.institution, item.location, item.gpa?('GPA '+item.gpa):''); break;
+        case 'skills': parts.push(item.category, item.list); break;
+        case 'certifications': parts.push(item.name, item.issuer); break;
+        case 'projects': parts.push(item.name, item.description, item.tech); break;
+        case 'languages': parts.push(item.language, item.proficiency); break;
+        case 'awards': parts.push(item.title, item.issuer, item.description); break;
+        case 'custom': parts.push(item.title, item.subtitle, item.description); break;
+      }
+    });
+  });
+  return parts.filter(Boolean).join(' ');
+}
+
+function isConventional(type, title){
+  const t = (title||'').trim().toLowerCase();
+  return (CONVENTIONAL_TITLES[type]||[]).includes(t);
+}
+
+function scoreSectionHeaders(){
+  let score = 0;
+  const tips = [];
+  ['experience','education','skills'].forEach(type=>{
+    const sec = state.sections.find(s=>s.type===type && s.visible && s.items.some(i=>!isItemEmpty(type,i)));
+    if(!sec){
+      tips.push(`Add a "${SECTION_META[type].label}" section with at least one entry.`);
+    } else if(isConventional(type, sec.title)){
+      score += 5;
+    } else {
+      score += 2;
+      tips.push(`Rename "${sec.title}" to a conventional heading like "${SECTION_META[type].label}" so ATS parsers recognize it.`);
+    }
+  });
+  return { score, max:15, tip: tips.length ? tips.join(' ') : 'All standard sections present with conventional headings.' };
+}
+
+function scoreContact(){
+  const p = state.personal;
+  let score = 0; const tips = [];
+  if(p.email.trim() && p.email.includes('@')) score += 5; else tips.push('Add a valid email address.');
+  if(p.phone.trim()) score += 5; else tips.push('Add a phone number.');
+  return { score, max:10, tip: tips.length ? tips.join(' ') : 'Contact information is complete.' };
+}
+
+function scoreQuantifiable(){
+  const bullets = getAllBullets();
+  if(bullets.length===0) return { score:0, max:15, tip:'Add experience bullets, then quantify results with numbers, %, or $ where possible.' };
+  const withNumbers = bullets.filter(b=>/[\d%$]/.test(b)).length;
+  const pct = withNumbers / bullets.length;
+  const score = Math.round(pct*15);
+  return { score, max:15, tip:`${withNumbers} of ${bullets.length} bullets include a measurable result. Add numbers (%, $, time saved, team size) to strengthen the rest.` };
+}
+
+function scoreActionVerbs(){
+  const bullets = getAllBullets();
+  if(bullets.length===0) return { score:0, max:15, tip:'Add experience bullets starting with strong action verbs (e.g. "Led", "Built", "Increased").' };
+  let good = 0; let weakCount = 0;
+  bullets.forEach(b=>{
+    const lower = b.toLowerCase().trim();
+    const isWeak = WEAK_STARTERS.some(w=>lower.startsWith(w));
+    const firstWord = (lower.match(/^[a-z']+/)||[''])[0];
+    if(!isWeak && ACTION_VERB_SET.has(firstWord)) good++;
+    if(isWeak) weakCount++;
+  });
+  const pct = good / bullets.length;
+  const score = Math.round(pct*15);
+  let tip = `${good} of ${bullets.length} bullets start with a strong action verb.`;
+  if(weakCount>0) tip += ` ${weakCount} use weak phrasing like "Responsible for" — replace with a direct action verb.`;
+  return { score, max:15, tip };
+}
+
+function scoreWordCount(){
+  const count = wordCount(getFullText());
+  let score, tip;
+  if(count < 300){
+    score = Math.round((count/300)*10);
+    tip = `Your CV is ${count} words — aim for 300-1000 words so ATS systems don't flag it as too sparse.`;
+  } else if(count <= 1000){
+    score = 10;
+    tip = `Your CV is ${count} words — a healthy length for ATS parsing.`;
+  } else {
+    score = Math.max(0, 10 - Math.round((count-1000)/200));
+    tip = `Your CV is ${count} words — consider trimming below 1000 words; very dense resumes risk truncation by some parsers.`;
+  }
+  return { score, max:10, tip };
+}
+
+function computeKeywordMatch(){
+  const jdWords = new Set(tokenize(state.jobDescription));
+  const cvWords = new Set(tokenize(getFullText()));
+  const matched = [...jdWords].filter(w=>cvWords.has(w)).sort();
+  const missing = [...jdWords].filter(w=>!cvWords.has(w)).sort();
+  const pct = jdWords.size ? matched.length/jdWords.size : 0;
+  const score = Math.round(pct*25);
+  const tip = `${matched.length} of ${jdWords.size} key terms from the job description appear in your CV (${Math.round(pct*100)}%). ${missing.length ? 'Consider naturally incorporating missing terms where truthful.' : 'Excellent alignment!'}`;
+  return { matched, missing, score, tip };
+}
+
+function computeATSScore(){
+  const breakdown = [];
+  let mandatoryMax = 0, mandatoryScore = 0;
+
+  const sec = scoreSectionHeaders(); breakdown.push({label:'Standard Section Headers', ...sec}); mandatoryMax+=sec.max; mandatoryScore+=sec.score;
+  const con = scoreContact(); breakdown.push({label:'Contact Info Completeness', ...con}); mandatoryMax+=con.max; mandatoryScore+=con.score;
+  const quant = scoreQuantifiable(); breakdown.push({label:'Quantifiable Achievements', ...quant}); mandatoryMax+=quant.max; mandatoryScore+=quant.score;
+  const verbs = scoreActionVerbs(); breakdown.push({label:'Action-Verb Usage', ...verbs}); mandatoryMax+=verbs.max; mandatoryScore+=verbs.score;
+  const wc = scoreWordCount(); breakdown.push({label:'Word Count', ...wc}); mandatoryMax+=wc.max; mandatoryScore+=wc.score;
+
+  const fmt = { score:10, max:10, tip:'No tables, columns, icon-only labels, or embedded graphics are used — this format is fully ATS-parsable by design.' };
+  breakdown.push({label:'Format & Font Compliance', ...fmt}); mandatoryMax+=fmt.max; mandatoryScore+=fmt.score;
+
+  let matched = [], missing = [], total;
+  if(state.jobDescription.trim().length > 10){
+    const kw = computeKeywordMatch();
+    breakdown.push({label:'Keyword Match vs Job Description', score:kw.score, max:25, tip:kw.tip});
+    matched = kw.matched; missing = kw.missing;
+    total = Math.round(((mandatoryScore + kw.score) / (mandatoryMax + 25)) * 100);
+  } else {
+    breakdown.push({label:'Keyword Match vs Job Description', score:null, max:25, tip:'Paste a target job description below to score keyword alignment.'});
+    total = Math.round((mandatoryScore / mandatoryMax) * 100);
+  }
+  return { total, breakdown, matched, missing };
+}
+
+function renderATSPanel(){
+  const result = computeATSScore();
+  document.getElementById('atsScoreValue').textContent = result.total;
+  const bar = document.getElementById('atsScoreBar');
+  bar.style.width = result.total + '%';
+  bar.textContent = result.total + '%';
+  bar.className = 'progress-bar ' + (result.total < 50 ? 'bg-danger' : result.total < 75 ? 'bg-warning' : 'bg-success');
+
+  const photoWarningEl = document.getElementById('photoWarning');
+  const showPhotoWarning = state.personal.showPhoto && !!state.personal.photoDataUrl;
+  photoWarningEl.style.display = showPhotoWarning ? 'block' : 'none';
+
+  document.getElementById('atsBreakdown').innerHTML = result.breakdown.map(b=>{
+    const pct = b.score===null ? 0 : Math.round((b.score/b.max)*100);
+    const scoreLabel = b.score===null ? `— / ${b.max}` : `${b.score} / ${b.max}`;
+    return `
+    <div class="ats-breakdown-item">
+      <div class="d-flex justify-content-between small fw-semibold"><span>${esc(b.label)}</span><span>${scoreLabel}</span></div>
+      <div class="progress mb-1" style="height:6px;"><div class="progress-bar bg-secondary" style="width:${pct}%"></div></div>
+      <div class="ats-tip">${esc(b.tip)}</div>
+    </div>`;
+  }).join('');
+
+  const matchedEl = document.getElementById('matchedKeywords');
+  const missingEl = document.getElementById('missingKeywords');
+  matchedEl.innerHTML = result.matched.length ? result.matched.slice(0,50).map(w=>`<span class="badge bg-success me-1 mb-1">${esc(w)}</span>`).join('') : '<span class="text-muted small">Paste a job description to see matches.</span>';
+  missingEl.innerHTML = result.missing.length ? result.missing.slice(0,50).map(w=>`<span class="badge bg-secondary me-1 mb-1">${esc(w)}</span>`).join('') : '<span class="text-muted small">—</span>';
+}
+
+/* =========================================================================
+   EVENT BINDINGS
+   ========================================================================= */
+function handleFieldChange(t){
+  if(t.dataset.personal !== undefined){
+    state.personal[t.dataset.personal] = t.value;
+  } else if(t.dataset.summary !== undefined){
+    state.summary = t.value;
+  } else if(t.dataset.jobdesc !== undefined){
+    state.jobDescription = t.value;
+  } else if(t.dataset.titleField !== undefined && t.dataset.sectionId){
+    const s = state.sections.find(x=>x.id===t.dataset.sectionId);
+    if(s) s.title = t.value;
+  } else if(t.dataset.action === 'toggle-visibility'){
+    const s = state.sections.find(x=>x.id===t.dataset.sectionId);
+    if(s){
+      s.visible = t.checked;
+      const card = document.querySelector(`[data-card-section="${s.id}"]`);
+      if(card) card.classList.toggle('section-hidden', !s.visible);
+    }
+  } else if(t.dataset.bulletId){
+    const s = state.sections.find(x=>x.id===t.dataset.sectionId);
+    const item = s && s.items.find(i=>i.id===t.dataset.itemId);
+    const b = item && item.bullets.find(b=>b.id===t.dataset.bulletId);
+    if(b) b.text = t.value;
+  } else if(t.dataset.field && t.dataset.sectionId && t.dataset.itemId){
+    const s = state.sections.find(x=>x.id===t.dataset.sectionId);
+    const item = s && s.items.find(i=>i.id===t.dataset.itemId);
+    if(item){
+      item[t.dataset.field] = (t.type==='checkbox') ? t.checked : t.value;
+      if(t.dataset.field === 'current'){
+        const endInput = document.querySelector(`input[data-section-id="${s.id}"][data-item-id="${item.id}"][data-field="endDate"]`);
+        if(endInput) endInput.disabled = t.checked;
+      }
+    }
+  } else if(t.dataset.cl){
+    state.coverLetter[t.dataset.cl] = t.value;
+  } else if(t.dataset.clPoint !== undefined){
+    state.coverLetter.points[Number(t.dataset.clPoint)] = t.value;
+  }
+  renderPreview();
+  renderATSPanel();
+}
+
+function renderPreview(){
+  renderCVPreview();
+  renderCLPreview();
+}
+
+/* =========================================================================
+   PROFILE PHOTO HANDLING
+   ========================================================================= */
+function updatePhotoPreviewUI(){
+  const img = document.getElementById('photoPreview');
+  const removeBtn = document.getElementById('removePhotoBtn');
+  if(state.personal.photoDataUrl){
+    img.src = state.personal.photoDataUrl;
+    img.style.display = 'inline-block';
+    removeBtn.style.display = 'inline-block';
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+    removeBtn.style.display = 'none';
+  }
+  document.getElementById('showPhotoToggle').checked = !!state.personal.showPhoto;
+}
+
+function bindPhotoEvents(){
+  document.getElementById('photoInput').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.personal.photoDataUrl = reader.result;
+      updatePhotoPreviewUI();
+      renderPreview();
+      renderATSPanel();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('removePhotoBtn').addEventListener('click', ()=>{
+    state.personal.photoDataUrl = null;
+    state.personal.showPhoto = false;
+    document.getElementById('photoInput').value = '';
+    updatePhotoPreviewUI();
+    renderPreview();
+    renderATSPanel();
+  });
+
+  document.getElementById('showPhotoToggle').addEventListener('change', e=>{
+    state.personal.showPhoto = e.target.checked;
+    renderPreview();
+    renderATSPanel();
+  });
+}
+
+/* =========================================================================
+   PANEL-STATE COLLAPSE TRACKING (Bootstrap collapse show/hide -> panelState)
+   ========================================================================= */
+function bindPanelStateTracking(){
+  document.getElementById('cvTab').addEventListener('shown.bs.collapse', e=>{
+    const id = e.target.dataset.panelId;
+    if(id) panelState[id] = true;
+  });
+  document.getElementById('cvTab').addEventListener('hidden.bs.collapse', e=>{
+    const id = e.target.dataset.panelId;
+    if(id) panelState[id] = false;
+  });
+}
+
+function syncStaticPanelState(id){
+  const open = isPanelOpen(id);
+  const collapseEl = document.getElementById('collapse-'+id);
+  const btn = collapseEl && collapseEl.previousElementSibling && collapseEl.previousElementSibling.querySelector('.panel-toggle-btn');
+  if(collapseEl) collapseEl.classList.toggle('show', open);
+  if(btn){ btn.classList.toggle('collapsed', !open); btn.setAttribute('aria-expanded', open); }
+}
+
+/* =========================================================================
+   LOCALSTORAGE SAVE / LOAD (the one deliberate exception to "no persistent
+   storage" — used only on explicit user action, never on every keystroke)
+   ========================================================================= */
+const STORAGE_KEY = 'gnolexCVData';
+
+function syncPersonalSummaryInputs(){
+  document.querySelector('[data-personal="name"]').value = state.personal.name;
+  document.querySelector('[data-personal="phone"]').value = state.personal.phone;
+  document.querySelector('[data-personal="email"]').value = state.personal.email;
+  document.querySelector('[data-personal="location"]').value = state.personal.location;
+  document.querySelector('[data-personal="linkedin"]').value = state.personal.linkedin;
+  document.querySelector('[data-personal="portfolio"]').value = state.personal.portfolio;
+  document.querySelector('[data-summary]').value = state.summary;
+  document.querySelector('[data-jobdesc]').value = state.jobDescription;
+}
+
+function updateLastSavedLabel(timestamp){
+  document.getElementById('lastSavedLabel').textContent = timestamp ? ('Last saved: ' + new Date(timestamp).toLocaleString()) : 'Last saved: never';
+}
+
+function resyncUidCounter(){
+  let max = 0;
+  JSON.stringify(state, (k, v) => {
+    if(typeof v === 'string' && /^id\d+$/.test(v)){
+      const n = parseInt(v.slice(2), 10);
+      if(n > max) max = n;
+    }
+    return v;
+  });
+  uidCounter = max;
+}
+
+function saveToLocalStorage(){
+  const errorEl = document.getElementById('saveErrorMsg');
+  errorEl.style.display = 'none';
+  const savedAt = Date.now();
+  try{
+    const payload = JSON.stringify({ version:1, savedAt, state, panelState });
+    localStorage.setItem(STORAGE_KEY, payload);
+    updateLastSavedLabel(savedAt);
+  } catch(err){
+    errorEl.textContent = 'Could not save: browser storage limit exceeded. This is often caused by a large profile photo — try removing it or using a smaller image, then save again.';
+    errorEl.style.display = 'block';
+  }
+}
+
+function tryLoadFromStorage(){
+  let raw = null;
+  try{ raw = localStorage.getItem(STORAGE_KEY); } catch(err){ return; }
+  if(!raw) return;
+  let payload;
+  try{ payload = JSON.parse(raw); } catch(err){ return; }
+  if(!payload || !payload.state) return;
+  if(!confirm('A previously saved CV was found. Load it?')) return;
+  state = payload.state;
+  panelState = payload.panelState || {};
+  resyncUidCounter();
+  syncPersonalSummaryInputs();
+  updatePhotoPreviewUI();
+  renderCLEditor();
+  renderEditor();
+  renderPreview();
+  renderATSPanel();
+  syncStaticPanelState('personal');
+  syncStaticPanelState('summary');
+  updateLastSavedLabel(payload.savedAt);
+}
+
+function clearSavedData(){
+  if(!confirm("This will permanently delete your saved CV from this browser's storage. It will not change what's currently on screen. Continue?")) return;
+  try{ localStorage.removeItem(STORAGE_KEY); } catch(err){}
+  updateLastSavedLabel(null);
+}
+
+function bindEditorEvents(){
+  const sectionsContainer = document.getElementById('sectionsContainer');
+  const cvTab = document.getElementById('cvTab');
+  const clEditor = document.getElementById('clEditor');
+
+  cvTab.addEventListener('input', e=>handleFieldChange(e.target));
+  cvTab.addEventListener('change', e=>handleFieldChange(e.target));
+  clEditor.addEventListener('input', e=>handleFieldChange(e.target));
+  clEditor.addEventListener('change', e=>handleFieldChange(e.target));
+
+  sectionsContainer.addEventListener('click', e=>{
+    const btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    const action = btn.dataset.action;
+    const secId = btn.dataset.sectionId;
+    const itemId = btn.dataset.itemId;
+    const bulletId = btn.dataset.bulletId;
+    const section = state.sections.find(s=>s.id===secId);
+    if(!section) return;
+    switch(action){
+      case 'add-item': section.items.push(SECTION_META[section.type].newItem()); break;
+      case 'remove-item': section.items = section.items.filter(i=>i.id!==itemId); break;
+      case 'move-item-up': moveInArray(section.items, itemId, -1); break;
+      case 'move-item-down': moveInArray(section.items, itemId, 1); break;
+      case 'add-bullet': { const item=section.items.find(i=>i.id===itemId); if(item) item.bullets.push({id:uid(), text:''}); break; }
+      case 'remove-bullet': { const item=section.items.find(i=>i.id===itemId); if(item) item.bullets = item.bullets.filter(b=>b.id!==bulletId); break; }
+      case 'move-section-up': moveInArray(state.sections, secId, -1); break;
+      case 'move-section-down': moveInArray(state.sections, secId, 1); break;
+      case 'remove-section':
+        if(confirm('Remove this section and all its entries?')){
+          state.sections = state.sections.filter(s=>s.id!==secId);
+        }
+        break;
+      default: return;
+    }
+    renderEditor();
+    renderPreview();
+    renderATSPanel();
+  });
+
+  document.querySelectorAll('[data-add-standard]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.sections.push(newSection(btn.dataset.addStandard));
+      renderEditor(); renderPreview(); renderATSPanel();
+    });
+  });
+
+  document.getElementById('addCustomSectionBtn').addEventListener('click', ()=>{
+    const input = document.getElementById('customSectionTitleInput');
+    const title = input.value.trim() || 'Custom Section';
+    state.sections.push(newSection('custom', title));
+    input.value = '';
+    renderEditor(); renderPreview(); renderATSPanel();
+  });
+
+  document.getElementById('printCvBtn').addEventListener('click', ()=>window.print());
+  document.getElementById('printClBtn').addEventListener('click', ()=>window.print());
+
+  document.getElementById('saveDataBtn').addEventListener('click', saveToLocalStorage);
+  document.getElementById('clearCacheBtn').addEventListener('click', clearSavedData);
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(!confirm('This will clear all CV and cover letter data. Continue?')) return;
+    state = defaultState();
+    panelState = {};
+    document.querySelectorAll('[data-personal]').forEach(el=>el.value='');
+    document.querySelector('[data-summary]').value='';
+    document.querySelector('[data-jobdesc]').value='';
+    document.getElementById('photoInput').value='';
+    updatePhotoPreviewUI();
+    renderCLEditor();
+    renderEditor();
+    renderPreview();
+    renderATSPanel();
+    syncStaticPanelState('personal');
+    syncStaticPanelState('summary');
+  });
+
+  bindPhotoEvents();
+  bindPanelStateTracking();
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+function init(){
+  renderEditor();
+  renderCLEditor();
+  renderPreview();
+  renderATSPanel();
+  updatePhotoPreviewUI();
+  bindEditorEvents();
+  tryLoadFromStorage();
+}
+init();
+</script>
+</body>
+</html>
